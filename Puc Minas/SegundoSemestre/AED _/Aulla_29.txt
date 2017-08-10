@@ -1,0 +1,9 @@
+Aula dia 29
+
+Em java, quando uma classe A extends outra classe B, fazemos com que a classe A seja filha da classe B. Em outras palavras, é como se tudo da classe pai (metodos e atributos) tivessem sido declarados na classe filho.
+
+Quando chamamos um metodo super( ) dentro do construtor da classe filha, na verdade, estamos chamando o construtor do pai.
+
+Protected -> Dentro da classe e para os filihos da classe.
+
+Exercicio: Seja o problema de ordenação parcial, apenas os k menores, implemente os metodos de seleção parcial e inserção parcial. Referência: livro do Ziviane

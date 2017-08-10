@@ -1,0 +1,520 @@
+Trabalho Seminários
+Aluna: Giovanna Ávila Riqueti
+Matrícula: 553285
+
+1)Normal
+a)Codigo:
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+#include <stdlib.h>
+
+
+struct Compare { 
+	int val; 
+	int index; 
+};
+
+void inicializador(int vetor [ ], int max){
+	for (int i = 0; i < max; i ++ ){
+		vetor[i] = rand( )%100;
+	}
+}
+
+/*
+   Declara uma redução do OpenMP.
+   Uma redução garante que a variável tem uma cópia em cada thread. Mas seus valores
+   são reduzidos em uma variável global compartilhada.
+   Esta redução garante que a variável usada como parâmetro, do tipo Compare,
+   terá o maior valor ao final do processamento da thread.  
+ */
+#pragma omp declare reduction(maximum : struct Compare : omp_out = omp_in.val > omp_out.val ? omp_in : omp_out)
+
+void selectionsort(int arr[], int size, int num_threads) {
+
+	//     #pragma omp parallel 
+
+	omp_set_num_threads(num_threads);
+	for (int i = size - 1; i > 0; --i) {
+		struct Compare max;
+		max.val = arr[i];
+		max.index = i;
+
+		#pragma omp parallel for //reduction(maximum:max)
+		for (int j = i - 1; j >= 0; j--) {
+		#pragma omp critical
+			{
+				if (arr[j] > max.val) {
+					max.val = arr[j];
+					max.index = j;
+				}
+			}
+			int tn = omp_get_thread_num();
+		}
+
+		int tmp = arr[i];
+		arr[i] = max.val;
+		arr[max.index] = tmp;
+	}
+}
+
+
+void selecaoSerial(int arr[], int size ) {
+        for (int i = size - 1; i > 0; --i) {
+                struct Compare max;
+                max.val = arr[i];
+                max.index = i;
+                for (int j = i - 1; j >= 0; j--) {
+                     if (arr[j] > max.val) {
+                               max.val = arr[j];
+                               max.index = j;
+                     }
+        		}
+                int tmp = arr[i];
+                arr[i] = max.val;
+                arr[max.index] = tmp;
+        }
+}
+
+double processarSerial( double ti, double tf, int array[ ],int max ){
+	ti = omp_get_wtime( );
+	selecaoSerial( array, max );
+	tf = omp_get_wtime( );
+	double tempo = ((double)tf - ti);
+	return tempo;
+}
+
+int main()
+{
+	int max = 100;
+	FILE *p = fopen("psel1.txt", "w");
+
+	char string[1000];
+	int nthreads;	
+	fputs("psel1.c\nTAMANHO\t\tSerial\t\t1\t\t2\t\t4\t\t8\t\t16\t\t32\n", p);
+
+	for (int i = 0; i < 3; i++ ){
+		nthreads = 1;
+		int vetor[max];
+		int array[max];
+		double ti;
+		double tf;
+		double time [5];
+		double div [5];
+
+		inicializador( vetor, max );
+
+		inicializador( array, max );
+		processarSerial( ti, tf, array, max );
+
+		sprintf(string,"%d\t\t",max);
+        fputs(string, p);
+
+
+		double tempoSerial = processarSerial( ti, tf, array, max );
+		sprintf(string,"%6.4f\t\t", tempoSerial);
+		fputs(string, p);
+
+		int s = 0;
+		while ( s < 6 ){
+			double tempoI = omp_get_wtime( );
+	        selectionsort( vetor, max, nthreads);
+        	double tempoF = omp_get_wtime( );	
+			double procTime = ((double)tempoF - tempoI);
+			time[s] = procTime;
+			sprintf(string,"%6.4f\t\t", time[s]);
+		    fputs(string, p);
+			nthreads = nthreads*2;
+			s ++;
+		}
+
+		fputs("\n\t\t\t\t", p);	             
+		int f = 0;
+		while ( f < 6 ){
+			double divisao = tempoSerial/time[f];
+			div [f] = divisao;
+			sprintf(string,"%6.4f\t\t", div[f]);
+            fputs(string, p);
+			f ++;
+		}
+
+		fputs("\n\t\t\t\t", p);
+		
+		int n = 0;
+		while ( n < 6 ){
+			int threads = 1;
+			double eficiencia = div[n]/threads;
+			sprintf(string,"%6.4f\t\t", eficiencia);
+            fputs(string, p);
+			threads = threads*2;
+			n ++;
+		}
+		fputs("\n", p);
+			
+		max *= 10;
+	}
+	fclose(p);
+	return 0;
+
+}
+
+
+b)Tabela:
+
+psel1.c
+TAMANHO		Serial		1			2			4			8			16			32
+100			0.0000		0.0002		0.0013		0.0049		0.0080		0.0035		0.0075		
+						0.1127		0.0178		0.0047		0.0029		0.0067		0.0031		
+						0.1127		0.0178		0.0047		0.0029		0.0067		0.0031		
+1000		0.0013		0.0104		0.0354		0.0591		0.0537		0.0598		0.0861		
+						0.1251		0.0367		0.0219		0.0241		0.0217		0.0151		
+						0.1251		0.0367		0.0219		0.0241		0.0217		0.0151		
+10000		0.1251		0.9738		3.3959		5.9653		5.9001		6.2305		6.2329		
+						0.1285		0.0368		0.0210		0.0212		0.0201		0.0201		
+						0.1285		0.0368		0.0210		0.0212		0.0201		0.0201
+
+
+2)Critic
+a)Codigo:
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+#include <stdlib.h> 
+
+struct Compare { 
+  int val; 
+  int index; 
+};
+
+void inicializador(int vetor [ ], int max){
+	for (int i = 0; i < max; i ++ ){
+		vetor[i] = rand( )%100;
+	}
+}
+
+/*
+  Declara uma redução do OpenMP.
+  Uma redução garante que a variável tem uma cópia em cada thread. Mas seus valores
+  são reduzidos em uma variável global compartilhada.
+  Esta redução garante que a variável usada como parâmetro, do tipo Compare,
+  terá o maior valor ao final do processamento da thread.  
+*/
+#pragma omp declare reduction(maximum : struct Compare : omp_out = omp_in.val > omp_out.val ? omp_in : omp_out)
+
+void selectionsort(int arr[], int size, int num_threads) {
+    
+//     #pragma omp parallel 
+
+     omp_set_num_threads(num_threads);	
+     for (int i = size - 1; i > 0; --i) {
+        struct Compare max;
+        max.val = arr[i];
+        max.index = i;
+
+        #pragma omp parallel for reduction(maximum:max)
+        for (int j = i - 1; j >= 0; j--) {
+            #pragma omp critical
+	    {
+	    if (arr[j] > max.val) {
+                max.val = arr[j];
+                max.index = j;
+            }
+	    }
+	    int tn = omp_get_thread_num();
+        }
+
+        int tmp = arr[i];
+        arr[i] = max.val;
+        arr[max.index] = tmp;
+    }
+}
+
+
+void selecaoSerial(int arr[], int size ) {
+        for (int i = size - 1; i > 0; --i) {
+                struct Compare max;
+                max.val = arr[i];
+                max.index = i;
+                for (int j = i - 1; j >= 0; j--) {
+                     if (arr[j] > max.val) {
+                               max.val = arr[j];
+                               max.index = j;
+                     }
+        		}
+                int tmp = arr[i];
+                arr[i] = max.val;
+                arr[max.index] = tmp;
+        }
+}
+
+double processarSerial( double ti, double tf, int array[ ],int max ){
+	ti = omp_get_wtime( );
+	selecaoSerial( array, max );
+	tf = omp_get_wtime( );
+	double tempo = ((double)tf - ti);
+	return tempo;
+}
+
+
+int main()
+{
+    int max = 100;
+	FILE *p = fopen("psel1critic.txt", "w");
+
+	char string[1000];
+	int nthreads;	
+	fputs("psel1critic.c\nTAMANHO\t\tSerial\t\t1\t\t2\t\t4\t\t8\t\t16\t\t32\n", p);
+
+	for (int i = 0; i < 3; i++ ){
+		nthreads = 1;
+		int vetor[max];
+		int array[max];
+		double ti;
+		double tf;
+		double time [5];
+		double div [5];
+
+		inicializador( vetor, max );
+
+		inicializador( array, max );
+		processarSerial( ti, tf, array, max );
+
+		sprintf(string,"%d\t\t",max);
+        fputs(string, p);
+
+
+		double tempoSerial = processarSerial( ti, tf, array, max );
+		sprintf(string,"%6.4f\t\t", tempoSerial);
+		fputs(string, p);
+
+		int s = 0;
+		while ( s < 6 ){
+			double tempoI = omp_get_wtime( );
+	        selectionsort( vetor, max, nthreads);
+        	double tempoF = omp_get_wtime( );	
+			double procTime = ((double)tempoF - tempoI);
+			time[s] = procTime;
+			sprintf(string,"%6.4f\t\t", time[s]);
+		    fputs(string, p);
+			nthreads = nthreads*2;
+			s ++;
+		}
+
+		fputs("\n\t\t\t\t", p);	             
+		int f = 0;
+		while ( f < 6 ){
+			double divisao = tempoSerial/time[f];
+			div [f] = divisao;
+			sprintf(string,"%6.4f\t\t", div[f]);
+            fputs(string, p);
+			f ++;
+		}
+
+		fputs("\n\t\t\t\t", p);
+		
+		int n = 0;
+		while ( n < 6 ){
+			int threads = 1;
+			double eficiencia = div[n]/threads;
+			sprintf(string,"%6.4f\t\t", eficiencia);
+            fputs(string, p);
+			threads = threads*2;
+			n ++;
+		}
+		fputs("\n", p);
+			
+		max *= 10;
+	}
+	fclose(p);
+    return 0;
+}
+
+
+b)Tabela:
+
+psel1critic.c
+TAMANHO		Serial		1		2		4		8		16		32
+100			0.0000		0.0002		0.0007		0.0075		0.0064		0.0051		0.0080		
+						0.1117		0.0369		0.0033		0.0039		0.0048		0.0031		
+						0.1117		0.0369		0.0033		0.0039		0.0048		0.0031		
+1000		0.0013		0.0103		0.0353		0.0613		0.0533		0.0615		0.0838		
+						0.1257		0.0366		0.0211		0.0242		0.0210		0.0154		
+						0.1257		0.0366		0.0211		0.0242		0.0210		0.0154		
+10000		0.1239		0.9737		3.7247		6.2390		6.1374		6.2365		6.1997		
+						0.1272		0.0333		0.0199		0.0202		0.0199		0.0200		
+						0.1272		0.0333		0.0199		0.0202		0.0199		0.0200
+
+3)Reduct
+a)Codigo:
+
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+#include <stdlib.h>
+
+
+
+struct Compare { 
+  int val; 
+  int index; 
+};
+
+void inicializador(int vetor [ ], int max){
+	for (int i = 0; i < max; i ++ ){
+		vetor[i] = rand( )%100;
+	}
+}
+
+/*
+  Declara uma redução do OpenMP.
+  Uma redução garante que a variável tem uma cópia em cada thread. Mas seus valores
+  são reduzidos em uma variável global compartilhada.
+  Esta redução garante que a variável usada como parâmetro, do tipo Compare,
+  terá o maior valor ao final do processamento da thread.  
+*/
+#pragma omp declare reduction(maximum : struct Compare : omp_out = omp_in.val > omp_out.val ? omp_in : omp_out)
+
+void selectionsort(int arr[], int size, int num_threads) {
+    
+//     #pragma omp parallel 
+
+     omp_set_num_threads(num_threads);	
+     for (int i = size - 1; i > 0; --i) {
+        struct Compare max;
+        max.val = arr[i];
+        max.index = i;
+
+        #pragma omp parallel for reduction(maximum:max)
+        for (int j = i - 1; j >= 0; j--) {
+
+
+	    if (arr[j] > max.val) {
+                max.val = arr[j];
+                max.index = j;
+            }
+
+	    int tn = omp_get_thread_num();
+        }
+
+        int tmp = arr[i];
+        arr[i] = max.val;
+        arr[max.index] = tmp;
+    }
+}
+
+void selecaoSerial(int arr[], int size ) {
+        for (int i = size - 1; i > 0; --i) {
+                struct Compare max;
+                max.val = arr[i];
+                max.index = i;
+                for (int j = i - 1; j >= 0; j--) {
+                     if (arr[j] > max.val) {
+                               max.val = arr[j];
+                               max.index = j;
+                     }
+        	}
+                int tmp = arr[i];
+                arr[i] = max.val;
+                arr[max.index] = tmp;
+        }
+}
+
+double processarSerial( double ti, double tf, int array[ ],int max ){
+	ti = omp_get_wtime( );
+	selecaoSerial( array, max );
+	tf = omp_get_wtime( );
+	double tempo = ((double)tf - ti);
+	return tempo;
+}
+
+
+int main()
+{
+    int max = 100;
+	FILE *p = fopen("psel1reduct.txt", "w");
+
+	char string[1000];
+	int nthreads;	
+	fputs("psel1reduct.c\nTAMANHO\t\tSerial\t\t1\t\t2\t\t4\t\t8\t\t16\t\t32\n", p);
+
+	for (int i = 0; i < 3; i++ ){
+		nthreads = 1;
+		int vetor[max];
+		int array[max];
+		double ti;
+		double tf;
+		double time [5];
+		double div [5];
+
+		inicializador( vetor, max );
+
+		inicializador( array, max );
+		processarSerial( ti, tf, array, max );
+
+		sprintf(string,"%d\t\t",max);
+        fputs(string, p);
+
+
+		double tempoSerial = processarSerial( ti, tf, array, max );
+		sprintf(string,"%6.4f\t\t", tempoSerial);
+		fputs(string, p);
+
+		int s = 0;
+		while ( s < 6 ){
+			double tempoI = omp_get_wtime( );
+	        selectionsort( vetor, max, nthreads);
+        	double tempoF = omp_get_wtime( );	
+			double procTime = ((double)tempoF - tempoI);
+			time[s] = procTime;
+			sprintf(string,"%6.4f\t\t", time[s]);
+		    fputs(string, p);
+			nthreads = nthreads*2;
+			s ++;
+		}
+
+		fputs("\n\t\t\t\t", p);	             
+		int f = 0;
+		while ( f < 6 ){
+			double divisao = tempoSerial/time[f];
+			div [f] = divisao;
+			sprintf(string,"%6.4f\t\t", div[f]);
+            fputs(string, p);
+			f ++;
+		}
+
+		fputs("\n\t\t\t\t", p);
+		
+		int n = 0;
+		while ( n < 6 ){
+			int threads = 1;
+			double eficiencia = div[n]/threads;
+			sprintf(string,"%6.4f\t\t", eficiencia);
+            fputs(string, p);
+			threads = threads*2;
+			n ++;
+		}
+		fputs("\n", p);
+			
+		max *= 10;
+	}
+	fclose(p);
+    return 0;
+}
+
+
+
+b)Tabela:
+
+psel1reduct.c
+TAMANHO		Serial		1		2		4		8		16		32
+100			0.0001		0.0002		0.0032		0.0027		0.0054		0.0053		0.0070		
+						0.2969		0.0165		0.0195		0.0097		0.0099		0.0074		
+						0.2969		0.0165		0.0195		0.0097		0.0099		0.0074		
+1000		0.0013		0.0017		0.0016		0.0072		0.0193		0.0357		0.0929		
+						0.7443		0.8095		0.1789		0.0668		0.0361		0.0139		
+						0.7443		0.8095		0.1789		0.0668		0.0361		0.0139		
+10000		0.1239		0.1385		0.0793		0.1027		0.2520		0.4263		0.8034		
+						0.8947		1.5614		1.2066		0.4915		0.2906		0.1542		
+						0.8947		1.5614		1.2066		0.4915		0.2906		0.1542

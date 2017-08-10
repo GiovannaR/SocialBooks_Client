@@ -1,0 +1,9 @@
+#!/bin/sh
+mkdir backup
+if [ -d '$'
+1 ]; then
+cp -r $1 sh ./backup.sh pasta/Documents
+else 
+echo 'Falha'
+fi
+

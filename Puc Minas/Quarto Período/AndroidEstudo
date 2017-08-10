@@ -1,0 +1,5 @@
+ANDROID
+
+MainActivity.java -> Contém as classes para executar a atividade 
+activity_main -> Define o layout da imagem
+AndroidManifest.xml -> Descreve as características fundamentais do aplicativo

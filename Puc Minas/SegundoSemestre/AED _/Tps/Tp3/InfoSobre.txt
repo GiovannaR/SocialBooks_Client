@@ -1,0 +1,11 @@
+Vários padrões 
+html -> pegar diferente
+Comentário padrão java
+greg "Morte";
+Tudo de String
+Aprender HTML, a processar
+TMP -> Pasta
+Linux exclui!!
+Pessoa P = new Pessoa( ) -> P é um ponteiro
+No Tp3  cuidado quando tivermos que fazer comandos do tipo: c2 = c1, onde c1 e c2 são *ponteiros*. 
+"Alterando o codigo apontado por c2"
